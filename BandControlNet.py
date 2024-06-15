@@ -106,40 +106,28 @@ class BandControlNet(nn.Module):
                 self.feat_embed_size['mean_duration'] + self.feat_embed_size['mean_velocity'], self.D)
 
         if self.prior_info_flavor == 'both':
-            # 合并vq_codes, feat, chords, 并缩小维度为self.D
             self.combined_prior2d = nn.Linear(self.D * 2, self.D)
             self.combined_prior3d = nn.Linear(self.D * 3, self.D)
         if self.prior_info_flavor == 'meta':
-            # 合并feat, chords, 并缩小维度为self.D
             self.combined_prior2d = nn.Linear(self.D * 2, self.D)
 
         self.PosEmb = PositionalEncoding(self.D, dropout=self.position_dropout)
 
-        # === Encoder === normal transformer encoder, attention_type=linear
-        # self.track_encoder = TransformerEncoderBuilder.from_kwargs(
         self.time_encoder = TransformerEncoderBuilder.from_kwargs(
-            # n_layers=2,
-            n_layers=self.encoder_transformer_n_layer,  # 4-layer
+            n_layers=self.encoder_transformer_n_layer,  
             n_heads=self.encoder_transformer_n_head,
             query_dimensions=self.D // self.encoder_transformer_n_head,
             value_dimensions=self.D // self.encoder_transformer_n_head,
             feed_forward_dimensions=self.encoder_transformer_mlp,
             activation='gelu',
-            attention_type='linear',  # linear
+            attention_type='linear',  
             dropout=self.encoder_transformer_dropout,
         ).get()
-
-        # self.track_pooler = nn.Sequential(
-        #     nn.Linear(self.D, self.D),
-        #     nn.Tanh(),
-        # )
-        # self.time_encoder = copy.deepcopy(self.track_encoder)
 
         # === decoder ==
         self.bottom_decoder = self.get_decoder()
         self.top_decoder = self.get_decoder()
 
-        # 类似与track_encoder, 推理时注意！！！(获取每轨的bar_ids)
         self.fusion_decoder = TransformerEncoderBuilder.from_kwargs(
             n_layers=self.track_fusion_n_layer,  # 2-layer
             n_heads=self.decoder_transformer_n_head,
@@ -191,7 +179,6 @@ class BandControlNet(nn.Module):
 
     def cal_sim_attns(self, x_prior_seq, prior_len):
         # x_prior_seq: (bs, max_bar_nums, TRACK_NUMS, D)
-        # prior_len为prior中小节长度，训练时为bar_len, 推理时为参考序列的bar_len
 
         bs = x_prior_seq.shape[0]
         max_bar_nums = x_prior_seq.shape[1]
@@ -199,12 +186,6 @@ class BandControlNet(nn.Module):
         scale = self.D ** -0.5
         length_mask = LengthMask(prior_len, max_len=max_bar_nums, device=x_prior_seq.device)
 
-        # prior_query = self.sim_query_linear(x_prior_seq).reshape(bs, max_bar_nums, TRACK_NUMS, -1)
-        # prior_key = self.sim_key_linear(x_prior_seq).reshape(bs, max_bar_nums, TRACK_NUMS, -1)
-        # prior_QK = torch.einsum('nlhe, nshe->nhls', prior_query, prior_key)
-        # prior_QK = prior_QK + length_mask.additive_matrix[:, None, None]
-
-        # multi-head, # 将TRACK_NUMS当做n_head
         prior_query = self.sim_query_linear(x_prior_seq)
         prior_key = self.sim_key_linear(x_prior_seq)
         prior_QK = torch.einsum('nlhe, nshe->nhls', prior_query, prior_key)
@@ -219,7 +200,7 @@ class BandControlNet(nn.Module):
         return sim_attns
 
     def expand_sim_attns_per(self, x_per, sim_attns_per, bar_ids_per, bar_len):
-        # 扩充每个轨道的sim_attns
+        # expand sim_attns
         bs = x_per.shape[0]
         max_seq_len = x_per.shape[1]
 
@@ -248,13 +229,6 @@ class BandControlNet(nn.Module):
         return custom_attns
 
     def processing_features(self, features_len, chords_seq, feat_seq, vq_codes):
-        # features_len 训练是等同于bar_len, 生成时为实际小节长度
-        # chords_seq: (bs, max_bar_nums, 4), shared; max_bar_nums: batch中最大小节数
-        # feat_seq: (bs, max_bar_nums, 4, TRACK_NUMS) drums=>2维 feat_seq[:, :, :2, :]，其余padding，其他轨=>4维
-        # vq_codes: (bs, max_bar_nums, 16, TRACK_NUMS), 每个轨16维
-
-        # return features: (bs, max_bar_nums, D, TRACK_NUMS)
-
         # === Embedding (prior/features) ===
         if self.prior_info_flavor in ['meta', 'both']:
             bs = chords_seq.shape[0]
@@ -292,8 +266,6 @@ class BandControlNet(nn.Module):
                           for i in range(TRACK_NUMS)]
 
         if self.prior_info_flavor == 'meta':
-            # features = [self.combined_prior(torch.cat([x_chords, x_feat[i]], dim=-1)) for i in range(1, TRACK_NUMS)]
-
             features = [x_feat[0]]
             for i in range(1, TRACK_NUMS):
                 features.append(self.combined_prior2d(torch.cat([x_chords, x_feat[i]], dim=-1)))
@@ -301,8 +273,6 @@ class BandControlNet(nn.Module):
         if self.prior_info_flavor == 'latent':
             features = x_vq_codes
         if self.prior_info_flavor == 'both':
-            # features = [self.combined_prior(torch.cat([x_chords, x_feat[i], x_vq_codes[i]], dim=-1)) for i in range(TRACK_NUMS)]
-
             features = [self.combined_prior2d(torch.cat([x_feat[0], x_vq_codes[0]], dim=-1))]
             for i in range(1, TRACK_NUMS):
                 features.append(self.combined_prior3d(torch.cat([x_chords, x_feat[i], x_vq_codes[i]], dim=-1)))
@@ -310,27 +280,9 @@ class BandControlNet(nn.Module):
         # (bs, max_bar_nums, TRACK_NUMS, D)
         features = torch.stack(features, dim=2)
 
-        # add gaussian noise, before encoder
-        # features = (1 - self.blur) * features.clone() + \
-        #            self.blur * torch.empty(features.shape, device=features.device).normal_(mean=0, std=1)
 
-        # # === prior encoder ===
-        # features = self.PosEmb.dropout(features + self.PosEmb.pe[:, :max_bar_nums, :].unsqueeze(2))
-        # # (bs, max_bar_nums, TRACK_NUMS, D) => (bs*max_bar_nums, TRACK_NUMS, D)
-        # features = features.reshape(-1, TRACK_NUMS, self.D)
-        # features = self.track_encoder(features)
-        # # Global Average Pooling(Average) all Tracks
-        # features = torch.mean(features, dim=1)
-        # features = self.track_pooler(features)
-        # # (bs, max_bar_nums, D)
-        # features = features.reshape(-1, max_bar_nums, self.D)
-        # features = self.PosEmb(features)
-        # features_length_mask = LengthMask(features_len, max_len=max_bar_nums, device=features_len.device)
-        # features = self.time_encoder(features, attn_mask=None, length_mask=features_length_mask)
-
-        # === 更改版 ====
+        # =======
         features = self.PosEmb.dropout(features + self.PosEmb.pe[:, :max_bar_nums, :].unsqueeze(2))
-        # (bs, max_bar_nums, TRACK_NUMS, D) => (bs, TRACK_NUMS, max_bar_nums, D) => (bs*TRACK_NUMS, max_bar_nums, D)
         features = features.permute(0, 2, 1, 3).reshape(-1, max_bar_nums, self.D)
         features_length_mask = LengthMask(features_len.repeat_interleave(TRACK_NUMS),
                                           max_len=max_bar_nums,
@@ -338,11 +290,6 @@ class BandControlNet(nn.Module):
         features = self.time_encoder(features, attn_mask=None, length_mask=features_length_mask)
 
         features = features.reshape(-1, TRACK_NUMS, max_bar_nums, self.D).permute(0, 2, 1, 3)
-
-        # # (bs, max_bar_nums, D)
-        # return features
-
-        # (bs, max_bar_nums, TRACK_NUMS, D)
         return features
 
     def forward(self, x,
@@ -351,19 +298,9 @@ class BandControlNet(nn.Module):
                 bar_embed_ids, bar_ids, bar_len,
                 batch_mask,
                 ):
-        # x & batch_mask: (bs, max_seq_len, TRACK_NUMS)
-        # track_name: (bs, TRACK_NUMS) LONG
-
-        # bar_embed_ids: (bs, max_seq_len, TRACK_NUMS)
-        # bar_ids: (bs, 64, TRACK_NUMS); bar_len: (bs), shared
-
-        # chords_seq: (bs, max_bar_nums, TRACK_NUMS), shared; max_bar_nums: batch中最大小节数
-        # feat_seq: (bs, max_bar_nums, 4, TRACK_NUMS) drums=>2维 feat_seq[:, :, :2, :]，其余padding，其他轨=>4维
-        # vq_codes: (bs, max_bar_nums, 16, TRACK_NUMS), 每个轨16维
-
         bs = x.shape[0]
         max_seq_len = x.shape[1]
-        max_bar_nums = chords_seq.shape[1]  # 已padding，32/64
+        max_bar_nums = chords_seq.shape[1]  # padded，32/64
 
         # === encoder ===
         # (bs, max_bar_nums, TRACK_NUMS, D)
@@ -378,11 +315,6 @@ class BandControlNet(nn.Module):
                 custom_attns_per = self.expand_sim_attns_per(x[:, :, track_i], sim_attns_per,
                                                              bar_ids[:, :, track_i], bar_len)
                 custom_attns.append(custom_attns_per)
-
-        # # Global Average Pooling(Average) all Tracks
-        # features = torch.mean(features, dim=2)
-        # # (bs, max_bar_nums, D)
-        # features = self.track_pooler(features)
 
         # === Embedding ===
         # (bs, max_seq_len, TRACK_NUMS, D)
@@ -485,8 +417,6 @@ class BandControlNet(nn.Module):
         return y_event
 
     # ============== GENERATION / INFERENCE ==============
-    # def generate_perbar(self, x, track_embeded, features, features_len, sim_attns):
-    #     # features是已经mean后的
     def generate_perbar(self, x, track_embeded, features, features_len, sim_attns):
         # features: (bs, max_bar_nums, TRACK_NUMS, D)
         # 生成所有轨的新的单个小节
@@ -495,8 +425,6 @@ class BandControlNet(nn.Module):
         assert bs == 1
         max_bar_nums = features.shape[1]
 
-        # x 为所有轨道的完整小节list, 所有轨道均以Bar_XXX token结尾
-        # 先获取 x_bar_fusion
         x_bar_fusion = torch.zeros(1, max_bar_nums, TRACK_NUMS, self.D, device=x[0].device)
         custom_attns = []
         for track_i in range(TRACK_NUMS):
@@ -527,7 +455,6 @@ class BandControlNet(nn.Module):
             features_length_mask = LengthMask(features_len, max_len=max_bar_nums, device=x_per.device)
 
             x_bottom_per = self.forward_decoder(x_event_per, features_per,
-                                                # x_event_per, features,
                                                 self.bottom_decoder,
                                                 x_mask=seq_triangular_mask, x_length_mask=None,
                                                 memory_mask=None, memory_length_mask=features_length_mask,
@@ -538,14 +465,11 @@ class BandControlNet(nn.Module):
 
         # === fusion decoder ===
         x_bar_fusion = self.PosEmb.dropout(x_bar_fusion + self.PosEmb.pe[:, :max_bar_nums, :].unsqueeze(2))
-        # (bs, max_bar_nums, TRACK_NUMS, D) => (bs*max_bar_nums, TRACK_NUMS, D)
         x_bar_fusion = x_bar_fusion.reshape(bs * max_bar_nums, -1, self.D)
         x_bar_fusion = self.fusion_decoder(x_bar_fusion)
 
         x_bar_fusion = x_bar_fusion.reshape(bs, max_bar_nums, -1, self.D)
 
-
-        # 正式的生成步骤
         for track_i in range(TRACK_NUMS):
             x_per = x[track_i]
             track_embeded_per = track_embeded[:, track_i, :]
@@ -573,7 +497,6 @@ class BandControlNet(nn.Module):
 
                 # == bottom decoder ===
                 x_bottom_per = self.forward_decoder(x_event_per, features_per,
-                                                    # x_event_per, features,
                                                     self.bottom_decoder,
                                                     x_mask=seq_triangular_mask, x_length_mask=None,
                                                     memory_mask=None, memory_length_mask=features_length_mask,
@@ -586,7 +509,6 @@ class BandControlNet(nn.Module):
 
                 # === top decoder ===
                 x_top_per = self.forward_decoder(x_bottom_per, features_per,
-                                                 # x_bottom_per, features,
                                                  self.top_decoder,
                                                  x_mask=seq_triangular_mask, x_length_mask=None,
                                                  memory_mask=None, memory_length_mask=features_length_mask,
@@ -597,8 +519,7 @@ class BandControlNet(nn.Module):
                 y_sampling_per = sampling_v2(y_event_per[:, -1, :], k_p=0.02, mode='topk')
                 x_per = torch.cat([x_per, y_sampling_per], dim=1)
                 step += 1
-
-                # 单小节长度超过256自动停止，并报错
+                
                 if step > 256:
                     raise ValueError('generating wrong bar, without new bar_tokens.')
                 if y_sampling_per.detach().cpu().numpy() in [5, 6]:
