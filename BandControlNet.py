@@ -1,8 +1,4 @@
 
-# 使用单序列中提取的feat_seq, chords_seq, vq_codes作为条件
-# adaptive or original => 结构增强版本和普通版本
-#
-
 import copy
 
 import torch
