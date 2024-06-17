@@ -3,10 +3,12 @@
 
 This is the official implementation of BandControlNet
 
+<img alt="BandControlNet architecture" src="img/model_overall.png">
+
 ## Demo Page
 - [https://chinglohsiu.github.io/files/bandcontrolnet.html](https://chinglohsiu.github.io/files/bandcontrolnet.html)
 
-<img alt="BandControlNet architecture" src="img/model_overall.png">
+
 
 ## Description
 This paper presents BandControlNet, a controllable music cover generation model that:
