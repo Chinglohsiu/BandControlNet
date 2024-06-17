@@ -1,7 +1,7 @@
 # BandControlNet: Fine-Grained Spatiotemporal Features for Steerable Popular Music Generation
-## Introduction
-This is the official implementation of BandControlNet
 [![GitHub](https://img.shields.io/badge/GitHub-demo%20page-blue?logo=Github&style=flat-round)](https://chinglohsiu.github.io/files/bandcontrolnet.html)
+
+This is the official implementation of BandControlNet
 
 ## Demo Page
 - [https://chinglohsiu.github.io/files/bandcontrolnet.html](https://chinglohsiu.github.io/files/bandcontrolnet.html)
