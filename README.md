@@ -1,14 +1,10 @@
 # BandControlNet: Fine-Grained Spatiotemporal Features for Steerable Popular Music Generation
+[Demo](https://chinglohsiu.github.io/files/bandcontrolnet.html) | [Paper](https://arxiv.org/abs/2407.10462)
 [![GitHub](https://img.shields.io/badge/GitHub-demo%20page-blue?logo=Github&style=flat-round)](https://chinglohsiu.github.io/files/bandcontrolnet.html)
 
 This is the official implementation of BandControlNet
 
 <img alt="BandControlNet architecture" src="img/model_overall.png">
-
-## Demo Page
-- [https://chinglohsiu.github.io/files/bandcontrolnet.html](https://chinglohsiu.github.io/files/bandcontrolnet.html)
-
-
 
 ## Description
 This paper presents BandControlNet, a controllable music cover generation model that:
@@ -48,3 +44,16 @@ We conduct experiments on a popular music subset of the LakhMIDI(LMD) dataset, w
 
 ## Contact
 If you have any questions or requests, please write to chinglohsiu[AT]gmail[DOT].com
+
+
+## Citation
+Please consider citing the following article if you found our work useful:
+```
+@misc{luo2024bandcontrolnet,
+      title={BandControlNet: Fine-Grained Spatiotemporal Features for Steerable Popular Music Generation}, 
+      author={Luo, Jing and Yang, Xinyu and Herremans, Dorien},
+      year={2024},
+      eprint={2407.10462},
+      archivePrefix={arXiv},
+}
+```
