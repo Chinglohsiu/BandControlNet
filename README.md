@@ -49,11 +49,10 @@ If you have any questions or requests, please write to chinglohsiu[AT]gmail[DOT]
 ## Citation
 Please consider citing the following article if you found our work useful:
 ```
-@misc{luo2024bandcontrolnet,
-      title={BandControlNet: Fine-Grained Spatiotemporal Features for Steerable Popular Music Generation}, 
-      author={Luo, Jing and Yang, Xinyu and Herremans, Dorien},
-      year={2024},
-      eprint={2407.10462},
-      archivePrefix={arXiv},
+@article{luo2024bandcontrolnet,
+         title={BandControlNet: Fine-Grained Spatiotemporal Features for Steerable Popular Music Generation}, 
+         author={Luo, Jing and Yang, Xinyu and Herremans, Dorien},
+         journal={arXiv preprint arXiv:2407.10462},
+         year={2024}
 }
 ```
